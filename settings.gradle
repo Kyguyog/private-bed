@@ -1,0 +1,10 @@
+pluginManagement {
+    repositories {
+        maven { url = 'https://maven.fabricmc.net/' }
+        gradlePluginPortal()
+        mavenCentral()
+    }
+}
+rootProject.name = 'private-bed'
+def selected = providers.gradleProperty('targets').getOrElse('mc262,mc263,mc261,mc12111,mc1211,mc1201')
+selected.split(',').each { include it }

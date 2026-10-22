@@ -1,0 +1,61 @@
+plugins {
+    id 'net.fabricmc.fabric-loom' version '1.17.21' apply false
+    id 'net.fabricmc.fabric-loom-remap' version '1.17.21' apply false
+}
+
+def targets = [
+    mc262: ['26.2', '0.161.0+26.2', '0.7.0', 25, 'modern'],
+    mc263: ['26.3', '0.163.0+26.3', '0.7.0', 25, 'modern'],
+    mc261: ['26.1.2', '0.155.3+26.1.2', '0.7.0', 25, 'modern'],
+    mc12111: ['1.21.11', '0.141.6+1.21.11', '0.6.1', 21, 'modern'],
+    mc1211: ['1.21.1', '0.116.17+1.21.1', '0.3.1', 21, 'legacy'],
+    mc1201: ['1.20.1', '0.92.12+1.20.1', '0.3.1', 17, 'legacy']
+]
+subprojects {
+    def target = targets[project.name]
+    def modern = target[3] == 25
+    apply plugin: modern ? 'net.fabricmc.fabric-loom' : 'net.fabricmc.fabric-loom-remap'
+    group = 'dev.privatebed'
+    version = "${rootProject.property('mod_version')}+mc${target[0]}"
+    base { archivesName = 'private-bed' }
+    repositories { mavenCentral() }
+    dependencies {
+        minecraft "com.mojang:minecraft:${target[0]}"
+        if (!modern) mappings loom.officialMojangMappings()
+        add(modern ? 'implementation' : 'modImplementation', "net.fabricmc:fabric-loader:${rootProject.property('loader_version')}")
+        add(modern ? 'implementation' : 'modImplementation', "net.fabricmc.fabric-api:fabric-api:${target[1]}")
+        include(add(modern ? 'implementation' : 'modImplementation', "me.lucko:fabric-permissions-api:${target[2]}"))
+        testImplementation platform('org.junit:junit-bom:5.12.2')
+        testImplementation 'org.junit.jupiter:junit-jupiter'
+        testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+    }
+    sourceSets {
+        main {
+            java.srcDirs = [rootProject.file('src/main/java'), rootProject.file("src/${target[4]}/java")]
+            resources.srcDirs = [rootProject.file('src/main/resources')]
+        }
+        test { java.srcDirs = [rootProject.file('src/test/java')] }
+    }
+    tasks.withType(JavaCompile).configureEach { options.release = target[3] }
+    java { withSourcesJar() }
+    processResources {
+        inputs.property 'version', project.version
+        inputs.property 'minecraft', target[0]
+        inputs.property 'java', target[3]
+        inputs.property 'loader', rootProject.property('loader_version')
+        filesMatching('fabric.mod.json') {
+            expand(version: project.version, minecraft: target[0], java: target[3], loader: rootProject.property('loader_version'))
+        }
+    }
+    test { useJUnitPlatform() }
+    jar { from(rootProject.file('LICENSE')) }
+}
+tasks.register('build') { dependsOn subprojects.collect { it.tasks.named('build') } }
+
+tasks.register('release', Copy) {
+    dependsOn tasks.named('build')
+    into layout.projectDirectory.dir('dist')
+    subprojects.each { child ->
+        from(child.tasks.named(targets[child.name][3] == 25 ? 'jar' : 'remapJar'))
+    }
+}

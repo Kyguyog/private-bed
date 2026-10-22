@@ -1,0 +1,24 @@
+{
+  "schemaVersion": 1,
+  "id": "privatebed",
+  "version": "${version}",
+  "name": "Private Bed",
+  "authors": ["Kyguyog"],
+  "contact": {
+    "homepage": "https://modrinth.com/mod/private-bed",
+    "sources": "https://github.com/Kyguyog/private-bed",
+    "issues": "https://github.com/Kyguyog/private-bed/issues"
+  },
+  "description": "Privately find your own bed, or your last logout location. LuckPerms compatible.",
+  "license": "MIT",
+  "environment": "*",
+  "entrypoints": { "main": ["dev.privatebed.PrivateBed"] },
+  "depends": {
+    "fabricloader": ">=${loader}",
+    "minecraft": "${minecraft}",
+    "java": ">=${java}",
+    "fabric-api": "*",
+    "fabric-permissions-api-v0": "*"
+  },
+  "suggests": { "luckperms": "*" }
+}
