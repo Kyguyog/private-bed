@@ -9,10 +9,13 @@
     "sources": "https://github.com/Kyguyog/private-bed",
     "issues": "https://github.com/Kyguyog/private-bed/issues"
   },
-  "description": "Privately find your own bed, or your last logout location. LuckPerms compatible.",
+  "description": "Privately find your own bed, last logout location, world spawn, or last death, with optional coordinate displays. LuckPerms compatible.",
   "license": "MIT",
   "environment": "*",
-  "entrypoints": { "main": ["dev.privatebed.PrivateBed"] },
+  "entrypoints": {
+    "main": ["dev.privatebed.FabricEntrypoint"],
+    "modmenu": ["dev.privatebed.PrivateBedModMenu"]
+  },
   "depends": {
     "fabricloader": ">=${loader}",
     "minecraft": "${minecraft}",
@@ -20,5 +23,5 @@
     "fabric-api": "*",
     "fabric-permissions-api-v0": "*"
   },
-  "suggests": { "luckperms": "*" }
+  "suggests": { "luckperms": "*", "modmenu": "*" }
 }

@@ -1,11 +1,16 @@
 # Contributing
 
 Use JDK 25 and the included Gradle wrapper. Fabric Loader 0.19.5 or newer is
-required to run the mod; Fabric API and LuckPerms are separate dependencies.
+required for Fabric builds; Fabric API is required only on Fabric/Quilt and
+LuckPerms is optional on every loader. Forge and NeoForge use native permission APIs.
 
 ```sh
 ./gradlew release
 ```
+
+Dependency source attachments are skipped by default to keep the matrix build light.
+Use `-Dfabric.loom.ci=false` when you need remapped dependency sources in your IDE.
+The mod's own source jars and source archive are still generated.
 
 For a quicker build, select one target:
 
@@ -14,8 +19,12 @@ For a quicker build, select one target:
 ```
 
 The command, permission checks, and logout storage live in `src/main/java`.
-Minecraft adapters live in `src/modern/java` and `src/legacy/java`. Tests live in
-`src/test/java`. The root `build.gradle` defines the six version-specific projects.
+Minecraft adapters live in `src/legacy119`, `src/legacy`, `src/respawn`,
+`src/respawndata`, and `src/modern`. Tests live in
+`src/test/java`. The `targets.json` manifest defines all 28 projects and their dependency versions.
+Loader entrypoints and permission adapters live under `src/fabric`, `src/forge`,
+and `src/neoforge`; the command logic remains shared. Add manifest entries rather
+than duplicating target lists in CI or release scripts.
 
 Keep location replies private, allow non-OP access by default, and respect explicit
 permission denials. Avoid adding client commands that would imply access to remote
@@ -29,6 +38,9 @@ Do not commit generated jars, worlds, server configuration, credentials, or logs
 Contributions are distributed under the repository's MIT license.
 
 ## Releases
+
+Bump the version for each update: patch for fixes and small improvements, minor
+for new compatible features, and major for breaking changes.
 
 1. Update `mod_version` in `gradle.properties`, `CHANGELOG.md`, and the README's
    download filenames. The loader dependency and metadata both use `loader_version`.

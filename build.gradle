@@ -1,51 +1,80 @@
 plugins {
     id 'net.fabricmc.fabric-loom' version '1.17.21' apply false
     id 'net.fabricmc.fabric-loom-remap' version '1.17.21' apply false
+    id 'net.neoforged.moddev' version '2.0.148' apply false
+    id 'net.neoforged.moddev.legacyforge' version '2.0.148' apply false
 }
 
-def targets = [
-    mc262: ['26.2', '0.161.0+26.2', '0.7.0', 25, 'modern'],
-    mc263: ['26.3', '0.163.0+26.3', '0.7.0', 25, 'modern'],
-    mc261: ['26.1.2', '0.155.3+26.1.2', '0.7.0', 25, 'modern'],
-    mc12111: ['1.21.11', '0.141.6+1.21.11', '0.6.1', 21, 'modern'],
-    mc1211: ['1.21.1', '0.116.17+1.21.1', '0.3.1', 21, 'legacy'],
-    mc1201: ['1.20.1', '0.92.12+1.20.1', '0.3.1', 17, 'legacy']
-]
+def targets = new groovy.json.JsonSlurper().parse(file('targets.json'))
 subprojects {
     def target = targets[project.name]
-    def modern = target[3] == 25
-    apply plugin: modern ? 'net.fabricmc.fabric-loom' : 'net.fabricmc.fabric-loom-remap'
+    def fabric = target.loader == 'fabric'
+    def unobfuscated = target.java == 25
+    apply plugin: fabric ? (unobfuscated ? 'net.fabricmc.fabric-loom' : 'net.fabricmc.fabric-loom-remap') :
+            (target.loader == 'forge' ? 'net.neoforged.moddev.legacyforge' : 'net.neoforged.moddev')
     group = 'dev.privatebed'
-    version = "${rootProject.property('mod_version')}+mc${target[0]}"
-    base { archivesName = 'private-bed' }
-    repositories { mavenCentral() }
+    version = "${rootProject.property('mod_version')}+mc${target.minecraft}"
+    base { archivesName = fabric ? 'private-bed' : "private-bed-${target.loader}" }
+    repositories {
+        mavenCentral()
+        maven { url = 'https://maven.terraformersmc.com/releases/' }
+    }
+    if (!fabric) {
+        if (target.loader == 'forge') {
+            legacyForge {
+                enable { forgeVersion = target.platform; disableRecompilation = true }
+                runs { server { server(); programArgument '--nogui' } }
+                mods { privatebed { sourceSet sourceSets.main } }
+            }
+        } else {
+            neoForge {
+                enable { version = target.platform; disableRecompilation = true }
+                runs { server { server(); programArgument '--nogui' } }
+                mods { privatebed { sourceSet sourceSets.main } }
+            }
+        }
+    }
     dependencies {
-        minecraft "com.mojang:minecraft:${target[0]}"
-        if (!modern) mappings loom.officialMojangMappings()
-        add(modern ? 'implementation' : 'modImplementation', "net.fabricmc:fabric-loader:${rootProject.property('loader_version')}")
-        add(modern ? 'implementation' : 'modImplementation', "net.fabricmc.fabric-api:fabric-api:${target[1]}")
-        include(add(modern ? 'implementation' : 'modImplementation', "me.lucko:fabric-permissions-api:${target[2]}"))
+        if (fabric) {
+            minecraft "com.mojang:minecraft:${target.minecraft}"
+            if (!unobfuscated) mappings loom.officialMojangMappings()
+            def configuration = unobfuscated ? 'implementation' : 'modImplementation'
+            add(configuration, "net.fabricmc:fabric-loader:${rootProject.property('loader_version')}")
+            add(configuration, "net.fabricmc.fabric-api:fabric-api:${target.api}") {
+                version { strictly target.api }
+            }
+            include(add(configuration, "me.lucko:fabric-permissions-api:${target.permissions}") { transitive = false })
+            def menuVersions = ['26.3':'21.0.0', '26.2':'20.0.3', '26.1.2':'18.0.2', '26.1.1':'18.0.2', '26.1':'18.0.2',
+                '1.21.11':'17.0.1', '1.21.10':'16.0.1', '1.21.9':'16.0.1', '1.21.8':'15.0.2', '1.21.7':'15.0.2', '1.21.6':'15.0.2',
+                '1.21.5':'14.0.2', '1.21.4':'13.0.4', '1.21.3':'12.0.1', '1.21.2':'12.0.1', '1.21.1':'11.0.5', '1.21':'11.0.5',
+                '1.20.6':'10.0.0', '1.20.5':'10.0.0', '1.20.4':'9.2.0', '1.20.3':'9.0.0', '1.20.2':'8.0.1', '1.20.1':'7.2.2',
+                '1.19.4':'6.3.1', '1.19.3':'5.1.0', '1.19.2':'4.2.0-beta.2']
+            add(unobfuscated ? 'compileOnly' : 'modCompileOnly', "com.terraformersmc:modmenu:${menuVersions[target.minecraft]}") { transitive = false }
+        }
+        if (!fabric) testImplementation 'com.google.code.gson:gson:2.10.1'
         testImplementation platform('org.junit:junit-bom:5.12.2')
         testImplementation 'org.junit.jupiter:junit-jupiter'
         testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
     }
     sourceSets {
         main {
-            java.srcDirs = [rootProject.file('src/main/java'), rootProject.file("src/${target[4]}/java")]
-            resources.srcDirs = [rootProject.file('src/main/resources')]
+            java.srcDirs = [rootProject.file('src/main/java'), rootProject.file("src/${target.adapter}/java"),
+                            rootProject.file("src/${target.loader == 'neoforge' && target.java == 25 ? 'neoforgeModern' : target.loader}/java")]
+            resources.srcDirs = [rootProject.file(fabric ? 'src/main/resources' : "src/${target.loader}/resources")]
         }
         test { java.srcDirs = [rootProject.file('src/test/java')] }
     }
-    tasks.withType(JavaCompile).configureEach { options.release = target[3] }
-    java { withSourcesJar() }
+    if (fabric) sourceSets.main.java.srcDirs += [rootProject.file('src/modmenu/java'),
+            rootProject.file(['26.2', '26.3'].contains(target.minecraft) ? 'src/modmenuNavigation262/java' : 'src/modmenuNavigation/java'),
+            rootProject.file(target.minecraft == '1.19.2' ? 'src/modmenu1192/java' : 'src/modmenuModern/java')]
+    tasks.withType(JavaCompile).configureEach { options.release = target.java }
+    java { toolchain.languageVersion = JavaLanguageVersion.of(25); withSourcesJar() }
     processResources {
-        inputs.property 'version', project.version
-        inputs.property 'minecraft', target[0]
-        inputs.property 'java', target[3]
-        inputs.property 'loader', rootProject.property('loader_version')
-        filesMatching('fabric.mod.json') {
-            expand(version: project.version, minecraft: target[0], java: target[3], loader: rootProject.property('loader_version'))
-        }
+        def properties = [version: project.version, minecraft: target.minecraft, java: target.java,
+                          loader: target.minimum_loader ?: rootProject.property('loader_version'),
+                          platform: target.platform ?: '']
+        inputs.properties properties
+        filesMatching(['fabric.mod.json', 'META-INF/*.toml']) { expand properties }
     }
     test { useJUnitPlatform() }
     jar { from(rootProject.file('LICENSE')) }
@@ -56,6 +85,9 @@ tasks.register('release', Copy) {
     dependsOn tasks.named('build')
     into layout.projectDirectory.dir('dist')
     subprojects.each { child ->
-        from(child.tasks.named(targets[child.name][3] == 25 ? 'jar' : 'remapJar'))
+        def target = targets[child.name]
+        def artifact = target.loader == 'forge' ? 'reobfJar' :
+                (target.loader == 'fabric' && target.java != 25 ? 'remapJar' : 'jar')
+        from(child.tasks.named(artifact))
     }
 }

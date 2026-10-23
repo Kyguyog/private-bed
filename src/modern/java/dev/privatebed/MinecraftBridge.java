@@ -2,6 +2,8 @@ package dev.privatebed;
 
 import java.util.Optional;
 import net.minecraft.core.BlockPos;
+import net.minecraft.commands.CommandSourceStack;
+import net.minecraft.network.chat.Component;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
@@ -18,6 +20,23 @@ final class MinecraftBridge {
             return Optional.empty();
         }
         return Optional.of(new Location(spawn.dimension().identifier().toString(), pos.getX(), pos.getY(), pos.getZ()));
+    }
+
+    static Location spawn(MinecraftServer server) {
+        var spawn = server.overworld().getRespawnData();
+        BlockPos pos = spawn.pos();
+        return new Location(spawn.dimension().identifier().toString(), pos.getX(), pos.getY(), pos.getZ());
+    }
+
+    static Optional<Location> death(ServerPlayer player) {
+        return player.getLastDeathLocation().map(death -> {
+            BlockPos pos = death.pos();
+            return new Location(death.dimension().identifier().toString(), pos.getX(), pos.getY(), pos.getZ());
+        });
+    }
+
+    static void success(CommandSourceStack source, String message) {
+        source.sendSuccess(() -> Component.literal(message), false);
     }
 
     static Location current(ServerPlayer player) {

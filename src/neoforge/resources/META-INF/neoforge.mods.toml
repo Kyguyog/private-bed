@@ -1,0 +1,27 @@
+modLoader="javafml"
+loaderVersion="[4,)"
+license="MIT"
+
+[[mods]]
+modId="privatebed"
+version="${version}"
+displayName="Private Bed"
+authors="Kyguyog"
+displayTest="IGNORE_SERVER_VERSION"
+description='''
+Privately locate your bed, world spawn, last logout, or last death, with optional coordinate displays.
+'''
+
+[[dependencies.privatebed]]
+modId="neoforge"
+type="required"
+versionRange="[${platform},)"
+ordering="NONE"
+side="BOTH"
+
+[[dependencies.privatebed]]
+modId="minecraft"
+type="required"
+versionRange="[${minecraft}]"
+ordering="NONE"
+side="BOTH"

@@ -1,10 +1,18 @@
 pluginManagement {
     repositories {
         maven { url = 'https://maven.fabricmc.net/' }
+        maven { url = 'https://maven.neoforged.net/releases' }
         gradlePluginPortal()
         mavenCentral()
     }
 }
+plugins {
+    id 'org.gradle.toolchains.foojay-resolver-convention' version '1.0.0'
+}
 rootProject.name = 'private-bed'
-def selected = providers.gradleProperty('targets').getOrElse('mc262,mc263,mc261,mc12111,mc1211,mc1201')
-selected.split(',').each { include it }
+def targets = new groovy.json.JsonSlurper().parse(file('targets.json'))
+def selected = providers.gradleProperty('targets').getOrElse(targets.keySet().join(','))
+selected.split(',').each {
+    if (!targets.containsKey(it)) throw new GradleException("Unknown build target: $it")
+    include it
+}

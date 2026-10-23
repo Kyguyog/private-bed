@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Package the six built jars and tracked sources without including local server data."""
+"""Package the target matrix and non-ignored sources without local server data."""
 
 import argparse
 import hashlib
@@ -11,7 +11,12 @@ import zipfile
 
 
 ROOT = Path(__file__).resolve().parents[1]
-GAME_VERSIONS = ("26.2", "26.3", "26.1.2", "1.21.11", "1.21.1", "1.20.1")
+TARGETS = json.loads((ROOT / "targets.json").read_text())
+
+
+def artifact_name(version, target):
+    loader = "" if target["loader"] == "fabric" else "-" + target["loader"]
+    return f"private-bed{loader}-{version}+mc{target['minecraft']}.jar"
 
 
 def package(version):
@@ -19,16 +24,21 @@ def package(version):
         raise ValueError("Use a version such as 1.1.0 or 1.2.0-beta.1")
     prefix = f"private-bed-{version}"
     dist = ROOT / "dist"
-    jars = [dist / f"{prefix}+mc{game}.jar" for game in GAME_VERSIONS]
-    for game, jar in zip(GAME_VERSIONS, jars):
+    jars = [dist / artifact_name(version, target) for target in TARGETS.values()]
+    for target, jar in zip(TARGETS.values(), jars):
         with zipfile.ZipFile(jar) as archive:
-            metadata = json.loads(archive.read("fabric.mod.json"))
-            if metadata["version"] != f"{version}+mc{game}" or metadata["depends"]["minecraft"] != game:
-                raise ValueError(f"Unexpected version metadata in {jar.name}")
+            if target["loader"] == "fabric":
+                metadata = json.loads(archive.read("fabric.mod.json"))
+                if metadata["version"] != f"{version}+mc{target['minecraft']}" or metadata["depends"]["minecraft"] != target['minecraft']:
+                    raise ValueError(f"Unexpected version metadata in {jar.name}")
+            else:
+                name = "META-INF/mods.toml" if target["loader"] == "forge" else "META-INF/neoforge.mods.toml"
+                if f'version="{version}+mc{target["minecraft"]}"' not in archive.read(name).decode():
+                    raise ValueError(f"Unexpected version metadata in {jar.name}")
 
-    tracked = subprocess.check_output(["git", "ls-files", "-z"], cwd=ROOT).decode().split("\0")
+    tracked = subprocess.check_output(["git", "ls-files", "--cached", "--others", "--exclude-standard", "-z"], cwd=ROOT).decode().split("\0")
     if not any(name.startswith("src/") for name in tracked):
-        raise ValueError("Run this script from a Git checkout with the sources tracked")
+        raise ValueError("Run this script from a Git checkout with source files")
 
     source_zip = dist / f"{prefix}-source.zip"
     with zipfile.ZipFile(source_zip, "w", zipfile.ZIP_DEFLATED) as archive:
